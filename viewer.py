@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
 )
 from pathlib import Path
 from PyQt6.QtGui import QImage, QPixmap
+from PyQt6.QtCore import Qt
 import pandas as pd
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -63,6 +64,9 @@ class MainViewerWindow(QMainWindow):
         if plot_layout is None:
             plot_layout = QVBoxLayout(self.ui.plotWidget)
         plot_layout.addWidget(self.canvas)
+        self.ui.videoPlotLayout.setStretch(0, 1)
+        self.ui.videoPlotLayout.setStretch(1, 1)
+        self.ui.videoLabel.setScaledContents(False)
 
         self.ui.nextButton.clicked.connect(self.next_frame)
         self.ui.prevButton.clicked.connect(self.prev_frame)
@@ -137,8 +141,14 @@ class MainViewerWindow(QMainWindow):
         if ret:
             rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             h, w, ch = rgb_image.shape
-            qimg = QImage(rgb_image.data, w, h, ch * w, QImage.Format_RGB888)
-            self.ui.videoLabel.setPixmap(QPixmap.fromImage(qimg))
+            qimg = QImage(rgb_image.data, w, h, ch * w, QImage.Format.Format_RGB888)
+            pixmap = QPixmap.fromImage(qimg)
+            pixmap = pixmap.scaled(
+                self.ui.videoLabel.size(),
+                Qt.KeepAspectRatio,
+                Qt.SmoothTransformation,
+            )
+            self.ui.videoLabel.setPixmap(pixmap)
         self.ax.clear()
         self._plot_spectra(first_row)
         self.ax.set_title("First Spectral Row")
@@ -149,6 +159,11 @@ class MainViewerWindow(QMainWindow):
         """Release the video capture when the window is closed."""
         self.cap.release()
         super().closeEvent(event)
+
+    def resizeEvent(self, event) -> None:  # type: ignore[override]
+        super().resizeEvent(event)
+        # Rescale current frame to fit new label size
+        self.display_frame(self.current_frame)
 
     # ------------------------------------------------------------------
     # UI updates
@@ -163,8 +178,20 @@ class MainViewerWindow(QMainWindow):
         rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         height, width, ch = rgb_image.shape
         bytes_per_line = ch * width
-        qimg = QImage(rgb_image.data, width, height, bytes_per_line, QImage.Format.Format_RGB888)
-        self.ui.videoLabel.setPixmap(QPixmap.fromImage(qimg))
+        qimg = QImage(
+            rgb_image.data,
+            width,
+            height,
+            bytes_per_line,
+            QImage.Format.Format_RGB888,
+        )
+        pixmap = QPixmap.fromImage(qimg)
+        pixmap = pixmap.scaled(
+            self.ui.videoLabel.size(),
+            Qt.KeepAspectRatio,
+            Qt.SmoothTransformation,
+        )
+        self.ui.videoLabel.setPixmap(pixmap)
         self.update_spectrum(index)
         self.update_metadata_table(index)
 
