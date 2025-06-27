@@ -37,7 +37,7 @@
     <item><widget class="QPushButton" name="prevButton"><property name="text"><string>Previous Frame</string></property></widget></item>
     <item><widget class="QPushButton" name="nextButton"><property name="text"><string>Next Frame</string></property></widget></item>
     <item><widget class="QPushButton" name="exportButton"><property name="text"><string>Export Metadata</string></property></widget></item>
-    <item><widget class="QPushButton" name="importVideoButton"><property name="text"><string>Import Video</string></property></widget></item>
+    <item><widget class="QPushButton" name="importVideoButton"><property name="text"><string>Import Data</string></property></widget></item>
    </layout>
   </widget>
   <widget class="QMenuBar" name="menubar"/>

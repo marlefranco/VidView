@@ -78,4 +78,4 @@ class Ui_MainViewerWindow(object):
         self.prevButton.setText(_translate("MainViewerWindow", "Previous Frame"))
         self.nextButton.setText(_translate("MainViewerWindow", "Next Frame"))
         self.exportButton.setText(_translate("MainViewerWindow", "Export Metadata"))
-        self.importVideoButton.setText(_translate("MainViewerWindow", "Import Video"))
+        self.importVideoButton.setText(_translate("MainViewerWindow", "Import Data"))

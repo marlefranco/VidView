@@ -33,7 +33,7 @@ Run the GUI application:
 ```bash
 python main.py
 ```
-Without arguments the viewer loads sample data from the `ExampleFiles/` directory. Use the **Import Video** button to load your own dataset (video, frame times, spectral data and metadata). Navigate with **Next** and **Previous** to review frames, update the metadata table and export the results with **Export Metadata**.
+Without arguments the viewer loads sample data from the `ExampleFiles/` directory. Use the **Import Data** button to load your own dataset (video, frame times, spectral data and metadata). Navigate with **Next** and **Previous** to review frames, update the metadata table and export the results with **Export Metadata**.
 
 The `viewer/video_spectra_viewer.py` module also exposes a command line interface:
 ```bash

@@ -71,9 +71,12 @@ class MainViewerWindow(QMainWindow):
 
         self.ui.nextButton.clicked.connect(self.next_frame)
         self.ui.prevButton.clicked.connect(self.prev_frame)
-        self.ui.exportButton.clicked.connect(lambda checked=False: self.export_csv())
+        self.output_path = "output.csv"
+        self.ui.exportButton.clicked.connect(
+            lambda checked=False: self.export_csv(self.output_path)
+        )
         if hasattr(self.ui, "importVideoButton"):
-            self.ui.importVideoButton.clicked.connect(self.import_video)
+            self.ui.importVideoButton.clicked.connect(self.import_data)
         if hasattr(self.ui, "importSpectralButton"):
             self.ui.importSpectralButton.clicked.connect(self.import_spectral)
         if hasattr(self.ui, "importFrameTimesButton"):
@@ -288,23 +291,23 @@ class MainViewerWindow(QMainWindow):
     def export_csv(self, path: str = "output.csv") -> None:
         write_csv(path, self.frame_times, self.spectral_df, self.metadata_df)
 
-    def import_video(self) -> None:
-        """Open a dialog to select a new dataset and load it."""
-        file_path, _ = QFileDialog.getOpenFileName(
+    def import_data(self) -> None:
+        """Select a directory containing viewer data and load it."""
+        directory = QFileDialog.getExistingDirectory(
             self,
-            "Open Video",
+            "Select Data Directory",
             str(Path(self.video_path).resolve().parent),
-            "Video Files (*.avi *.mp4 *.mov *.mkv);;All Files (*)",
         )
-        if not file_path:
+        if not directory:
             return
 
-        base = Path(file_path).resolve().parent
+        base = Path(directory)
+        video = base / "video.avi"
         frame_times = base / "frame_times.txt"
         spectral = base / "parsed_data.txt"
         metadata = base / "control_inputs_log.txt"
 
-        missing = [p.name for p in (frame_times, spectral, metadata) if not p.exists()]
+        missing = [p.name for p in (video, frame_times, spectral, metadata) if not p.exists()]
         if missing:
             QMessageBox.warning(
                 self,
@@ -312,6 +315,15 @@ class MainViewerWindow(QMainWindow):
                 "Required data files not found: " + ", ".join(missing),
             )
             return
+
+        output_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Select Output CSV",
+            str(base / "output.csv"),
+            "CSV Files (*.csv);;All Files (*)",
+        )
+        if not output_path:
+            output_path = str(base / "output.csv")
 
         try:
             new_frame_times = parse_frame_times(str(frame_times))
@@ -322,10 +334,11 @@ class MainViewerWindow(QMainWindow):
             return
 
         self.cap.release()
-        self.video_path = file_path
+        self.video_path = str(video)
         self.frame_times_path = str(frame_times)
         self.spectral_path = str(spectral)
         self.metadata_path = str(metadata)
+        self.output_path = output_path
 
         self.cap = cv2.VideoCapture(self.video_path)
         self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
