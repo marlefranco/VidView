@@ -1,0 +1,2 @@
+timestamp,filename1,filename2,fps,dropdownAB,aimingBeamLevel,mode,laserPedal,fiberCondition,lightSource,lightSourceType,lightSourceMode,brightness,lightSourceFilterMode,scopeType,location,targetType,sweep,energy,frequency,fiberUID,targetNumber,annotations
+2025-06-13 13:28:54.063,Task,5,60,AB OFF,0,Standard,Left,Pristine,Olympus,Visera Elite II (LED),Auto,0,Standard,URF-V3-01,Renal Cavity,COM,NO,1,20,,,
