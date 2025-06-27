@@ -169,14 +169,22 @@ class MainViewerWindow(QMainWindow):
         timestamp = ""
         if index < len(self.frame_times):
             timestamp = self.frame_times[index]
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            font_scale = 1.0
+            thickness = 2
+            (text_width, text_height), baseline = cv2.getTextSize(
+                timestamp, font, font_scale, thickness
+            )
+            text_x = (frame.shape[1] - text_width) // 2
+            text_y = frame.shape[0] - baseline - 10
             cv2.putText(
                 frame,
                 timestamp,
-                (10, 30),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                1.0,
+                (text_x, text_y),
+                font,
+                font_scale,
                 (0, 255, 0),
-                2,
+                thickness,
                 cv2.LINE_AA,
             )
 
