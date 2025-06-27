@@ -9,13 +9,13 @@ from typing import List, Dict
 
 import cv2
 import matplotlib
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt6 import QtCore, QtGui, QtWidgets
 
 from .data_utils import read_csv_file, nearest_by_timestamp
 
-# Ensure using non-interactive backend for embedding in PyQt5
+# Ensure using non-interactive backend for embedding in PyQt6
 matplotlib.use("Agg")
 
 
@@ -113,7 +113,13 @@ class VideoSpectraViewer(QtWidgets.QMainWindow):
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         h, w, ch = frame_rgb.shape
         bytes_per_line = ch * w
-        qt_image = QtGui.QImage(frame_rgb.data, w, h, bytes_per_line, QtGui.QImage.Format_RGB888)
+        qt_image = QtGui.QImage(
+            frame_rgb.data,
+            w,
+            h,
+            bytes_per_line,
+            QtGui.QImage.Format.Format_RGB888,
+        )
         pixmap = QtGui.QPixmap.fromImage(qt_image)
         self.video_label.setPixmap(pixmap)
 
@@ -234,7 +240,7 @@ def main() -> None:
     app = QtWidgets.QApplication([])
     viewer = VideoSpectraViewer(args.video, args.spectra, args.controls)
     viewer.show()
-    app.exec_()
+    app.exec()
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # Video Spectra Viewer
 
-A PyQt5 app for inspecting video and synchronized spectral data frame by frame.
+A PyQt6 app for inspecting video and synchronized spectral data frame by frame.
 It allows loading custom datasets, editing per-frame metadata and exporting the
 results to CSV.
 
@@ -65,9 +65,7 @@ WSL allows you to run a Linux environment directly on Windows. This step is esse
    ```bash
    pip install -r requirements.txt
    ```
-   The application works with PyQt5 and also runs with PyQt6 when available.
-3. Generate the Python file for the Qt UI (handles PyQt5 or PyQt6):
-   The file lists PyQt5, opencv-python, matplotlib and other libraries.
+   The application requires PyQt6.
 3. Generate the Python file for the Qt UI:
 
 ---
@@ -86,10 +84,8 @@ The `generate_ui_py.sh` script converts Qt `.ui` files into Python `.py` files.
    ```
    This will generate the Python file (`.py`) corresponding to the `.ui` file in your project.
 
-3. If any errors occur (such as missing PyQt), ensure PyQt5 or PyQt6 is installed within your virtual environment:
+3. If any errors occur (such as missing PyQt), ensure PyQt6 is installed within your virtual environment:
    ```bash
-   pip install PyQt5
-   # or
    pip install PyQt6
    ```
    Without arguments the application loads sample data from the
