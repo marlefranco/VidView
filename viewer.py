@@ -51,6 +51,7 @@ class MainViewerWindow(QMainWindow):
         self.cap = cv2.VideoCapture(self.video_path)
         self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
         self.current_frame = 0
+        self.current_row = 0
 
         self.frame_times = parse_frame_times(self.frame_times_path)
         self.spectral_df = parse_spectral_data(self.spectral_path)
@@ -80,7 +81,7 @@ class MainViewerWindow(QMainWindow):
         if hasattr(self.ui, "analyzeButton"):
             self.ui.analyzeButton.clicked.connect(self.analyze_data)
 
-        self.display_frame(0)
+        self.display_row(0)
 
     # ------------------------------------------------------------------
     # Data Import Actions
@@ -101,7 +102,7 @@ class MainViewerWindow(QMainWindow):
             QMessageBox.warning(self, "Error Loading Data", str(exc))
             return
         self.spectral_path = file_path
-        self.update_spectrum(self.current_frame)
+        self.display_row(self.current_row)
 
     def import_frame_times(self) -> None:
         """Import frame time mapping for the current video."""
@@ -122,38 +123,14 @@ class MainViewerWindow(QMainWindow):
         self.total_frames = len(self.frame_times)
         if self.current_frame >= self.total_frames:
             self.current_frame = 0
-        self.display_frame(self.current_frame)
+        self.display_row(self.current_row)
 
     def analyze_data(self) -> None:
         """Show first spectral row and corresponding video frame."""
         if self.spectral_df.empty or not self.frame_times:
             QMessageBox.warning(self, "Missing Data", "Import video, frame times and spectra first")
             return
-        first_row = self.spectral_df.iloc[0]
-        ts = str(first_row["timestamp"])
-        target = datetime.strptime(ts, TS_FORMAT)
-        times = [datetime.strptime(t, TS_FORMAT) for t in self.frame_times]
-        diffs = [abs(t - target) for t in times]
-        frame_index = diffs.index(min(diffs))
-        self.current_frame = frame_index
-        self.cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
-        ret, frame = self.cap.read()
-        if ret:
-            rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            h, w, ch = rgb_image.shape
-            qimg = QImage(rgb_image.data, w, h, ch * w, QImage.Format.Format_RGB888)
-            pixmap = QPixmap.fromImage(qimg)
-            pixmap = pixmap.scaled(
-                self.ui.videoLabel.size(),
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation,
-            )
-            self.ui.videoLabel.setPixmap(pixmap)
-        self.ax.clear()
-        self._plot_spectra(first_row)
-        self.ax.set_title("First Spectral Row")
-        self.canvas.draw()
-        self.update_metadata_table(frame_index)
+        self.display_row(0)
 
     def closeEvent(self, event) -> None:  # type: ignore[override]
         """Release the video capture when the window is closed."""
@@ -163,7 +140,21 @@ class MainViewerWindow(QMainWindow):
     def resizeEvent(self, event) -> None:  # type: ignore[override]
         super().resizeEvent(event)
         # Rescale current frame to fit new label size
-        self.display_frame(self.current_frame)
+        self.display_row(self.current_row)
+
+    # ------------------------------------------------------------------
+    # Row based display
+    # ------------------------------------------------------------------
+    def display_row(self, row_index: int) -> None:
+        if row_index < 0 or row_index >= len(self.spectral_df):
+            return
+        row = self.spectral_df.iloc[row_index]
+        frame_index = self._find_nearest_frame_index(str(row["timestamp"]))
+        self.current_row = row_index
+        self.current_frame = frame_index
+        self.display_frame(frame_index)
+        self.update_spectrum_row(row_index, row)
+        self.update_metadata_table(frame_index)
 
     # ------------------------------------------------------------------
     # UI updates
@@ -175,6 +166,20 @@ class MainViewerWindow(QMainWindow):
         ret, frame = self.cap.read()
         if not ret:
             return
+        timestamp = ""
+        if index < len(self.frame_times):
+            timestamp = self.frame_times[index]
+            cv2.putText(
+                frame,
+                timestamp,
+                (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                1.0,
+                (0, 255, 0),
+                2,
+                cv2.LINE_AA,
+            )
+
         rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         height, width, ch = rgb_image.shape
         bytes_per_line = ch * width
@@ -192,15 +197,16 @@ class MainViewerWindow(QMainWindow):
             Qt.TransformationMode.SmoothTransformation,
         )
         self.ui.videoLabel.setPixmap(pixmap)
-        self.update_spectrum(index)
-        self.update_metadata_table(index)
 
-    def update_spectrum(self, index: int) -> None:
-        frame_time = self.frame_times[index]
-        row = self._find_nearest_spectral_row(frame_time)
+    def update_spectrum_row(self, row_index: int, row: pd.Series) -> None:
         self.ax.clear()
         self._plot_spectra(row)
-        self.ax.set_title(f"Spectrum @ Frame {index}")
+        title = f"Spectrum at {row['timestamp']}"
+        subtitle = (
+            f"Spec Row {row_index + 1}/{len(self.spectral_df)} "
+            f"Frame {self.current_frame + 1}/{self.total_frames}"
+        )
+        self.ax.set_title(f"{title}\n{subtitle}")
         self.canvas.draw()
 
     def update_metadata_table(self, index: int) -> None:
@@ -215,16 +221,16 @@ class MainViewerWindow(QMainWindow):
     # Navigation
     # ------------------------------------------------------------------
     def next_frame(self) -> None:
-        if self.current_frame < self.total_frames - 1:
+        if self.current_row < len(self.spectral_df) - 1:
             self._save_current_metadata()
-            self.current_frame += 1
-            self.display_frame(self.current_frame)
+            self.current_row += 1
+            self.display_row(self.current_row)
 
     def prev_frame(self) -> None:
-        if self.current_frame > 0:
+        if self.current_row > 0:
             self._save_current_metadata()
-            self.current_frame -= 1
-            self.display_frame(self.current_frame)
+            self.current_row -= 1
+            self.display_row(self.current_row)
 
     def _find_nearest_spectral_row(self, frame_time: str) -> pd.Series:
         """Return row in ``spectral_df`` closest to ``frame_time``."""
@@ -234,6 +240,13 @@ class MainViewerWindow(QMainWindow):
         )
         diffs = (timestamps - target).abs()
         return self.spectral_df.loc[diffs.idxmin()]
+
+    def _find_nearest_frame_index(self, spectrum_time: str) -> int:
+        """Return index in ``frame_times`` closest to ``spectrum_time``."""
+        target = datetime.strptime(spectrum_time, TS_FORMAT)
+        times = [datetime.strptime(t, TS_FORMAT) for t in self.frame_times]
+        diffs = [abs(t - target) for t in times]
+        return diffs.index(min(diffs))
 
     def _plot_spectra(self, spectra_row) -> None:
         """Plot spectra with wavelengths sorted numerically.
@@ -309,11 +322,12 @@ class MainViewerWindow(QMainWindow):
         self.cap = cv2.VideoCapture(self.video_path)
         self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
         self.current_frame = 0
+        self.current_row = 0
 
         self.frame_times = new_frame_times
         self.spectral_df = new_spectral_df
         self.metadata_df = new_metadata_df
 
-        self.display_frame(0)
+        self.display_row(0)
 
 
