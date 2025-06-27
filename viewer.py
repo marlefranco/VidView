@@ -145,8 +145,8 @@ class MainViewerWindow(QMainWindow):
             pixmap = QPixmap.fromImage(qimg)
             pixmap = pixmap.scaled(
                 self.ui.videoLabel.size(),
-                Qt.KeepAspectRatio,
-                Qt.SmoothTransformation,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
             )
             self.ui.videoLabel.setPixmap(pixmap)
         self.ax.clear()
@@ -188,8 +188,8 @@ class MainViewerWindow(QMainWindow):
         pixmap = QPixmap.fromImage(qimg)
         pixmap = pixmap.scaled(
             self.ui.videoLabel.size(),
-            Qt.KeepAspectRatio,
-            Qt.SmoothTransformation,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
         )
         self.ui.videoLabel.setPixmap(pixmap)
         self.update_spectrum(index)
