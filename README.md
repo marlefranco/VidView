@@ -1,125 +1,71 @@
 # Video Spectra Viewer
 
-A PyQt6 app for inspecting video and synchronized spectral data frame by frame.
-It allows loading custom datasets, editing per-frame metadata and exporting the
-results to CSV.
+A desktop application for inspecting video frames alongside synchronized spectral data. It allows interactive navigation through frames, editing per-frame metadata, and exporting combined data to CSV files.
 
----
+## Table of Contents
+- [Overview](#overview)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Features](#features)
+- [Technologies Used](#technologies-used)
+- [Contributing](#contributing)
+- [License](#license)
+- [Credits](#credits)
+- [Support](#support)
+- [Project Status](#project-status)
 
-## Features
-- Video player
-- Synchronized spectral graph
-- Editable metadata per frame
-- Import video, spectral data and frame-time mappings
-- One-click analysis to locate the first spectral entry
-- Export combined metadata and spectra to CSV
+## Overview
+Video Spectra Viewer loads a video together with corresponding frame timestamps, spectral readings and metadata. The application synchronises these data sources so you can step through the video frame by frame while inspecting the nearest spectral measurement. Edited metadata and spectra can be exported for further analysis.
 
----
-
-## Setup
-Follow the steps below to set up the application for development on a **Windows system** using **PyCharm IDE**.
-
-### Step 1: Install Windows Subsystem for Linux (WSL)
-WSL allows you to run a Linux environment directly on Windows. This step is essential if you want to run Bash scripts like `generate_ui_py.sh`. Follow these instructions to set it up:
-
-1. **Open PowerShell as Administrator**:
-   - Right-click the Start Menu and select `Windows Terminal (Admin)` or `PowerShell (Admin)`.
-
-2. **Install WSL**:
-   - Run the following command:
-     ```powershell
-     wsl --install
-     ```
-   - This will install WSL and the default Linux distribution (usually Ubuntu).
-   - Restart your computer if prompted.
-
-3. **Launch WSL**:
-   - Open the **Start Menu** and search for your installed Linux distribution (e.g., Ubuntu).
-   - When prompted, set up a username and password for your Linux user account.
-
-4. **Access Your Project**:
-   - Navigate to your project folder in WSL by running:
-     ```bash
-     cd /mnt/c/Users/<YourUsername>/PycharmProjects/VideoViewer
-     ```
-
----
-
-### Step 2: Set Up the Virtual Environment
-1. Open the project in **PyCharm IDE**.
-2. Open a WSL terminal in PyCharm or use the integrated terminal (ensure you're in WSL mode).
-3. Create and activate the virtual environment:
-   ```bash
-   python -m venv venv
-   # On Windows
-   venv\Scripts\activate
-   # On Linux/macOS
-   # source venv/bin/activate
-   ```
-   On Windows, you can also activate the virtual environment with:
-   ```bash
-   .venv\Scripts\activate
-   ```
-
-4. Install the required Python packages:
+## Installation
+1. Create and activate a Python virtual environment.
+2. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
-   The application requires PyQt6.
-3. Generate the Python file for the Qt UI:
-
----
-
-### Step 3: Generate the Python File for the Qt UI
-The `generate_ui_py.sh` script converts Qt `.ui` files into Python `.py` files.
-
-1. Ensure the script has executable permissions (skip this step if already done):
-   ```bash
-   chmod +x generate_ui_py.sh
-   ```
-
-2. Run the script directly:
+3. (Optional) Generate the Qt UI Python code if you modify the `.ui` file:
    ```bash
    ./generate_ui_py.sh
    ```
-   This will generate the Python file (`.py`) corresponding to the `.ui` file in your project.
 
-3. If any errors occur (such as missing PyQt), ensure PyQt6 is installed within your virtual environment:
-   ```bash
-   pip install PyQt6
-   ```
-   Without arguments the application loads sample data from the
-   `ExampleFiles/` directory.
+## Usage
+Run the GUI application:
+```bash
+python main.py
+```
+Without arguments the viewer loads sample data from the `ExampleFiles/` directory. Use the **Import Video** button to load your own dataset (video, frame times, spectral data and metadata). Navigate with **Next** and **Previous** to review frames, update the metadata table and export the results with **Export Metadata**.
 
-## Command-line usage
-- `python main.py` - start the GUI application.
-- `pytest` - run the test suite located in the `tests/` directory.
-- `pyinstaller --onefile main.py` - build a standalone Windows executable.
----
+The `viewer/video_spectra_viewer.py` module also exposes a command line interface:
+```bash
+python viewer/video_spectra_viewer.py <video> <spectra> [--controls CONTROL_LOG]
+```
 
-### Step 4: Run the Application
-Once everything is set up, you can run the application by executing the main Python script:
+## Features
+- Video playback with frame-by-frame navigation
+- Graph of spectral intensities synchronized with the current frame
+- Editable metadata per frame
+- Import video, spectral data and frame-time mappings
+- Analysis action to jump to the first spectral record
+- Export combined metadata and spectra to CSV
 
-1. **Activate the Virtual Environment** (if not already activated):
-   ```bash
-   source .venv/bin/activate   # On Linux/Mac/WSL
-   .venv\Scripts\activate      # On Windows
-   ```
+## Technologies Used
+- [PyQt6](https://www.riverbankcomputing.com/software/pyqt/) for the GUI
+- [OpenCV](https://opencv.org/) for video handling
+- [Matplotlib](https://matplotlib.org/) for plotting spectra
+- [pandas](https://pandas.pydata.org/) for data processing
 
-2. **Run the Application**:
-   ```bash
-   python main.py
-   ```
+## Contributing
+Contributions are welcome! Fork the repository and submit a pull request. Please ensure code is formatted with standard tools and include tests when appropriate.
 
-3. **Optional: Specify Configuration or Parameters**:
-   If the application supports configuration files or command-line arguments, ensure they are passed correctly when launching the `main.py` file.
+## License
+This project is licensed under the [MIT License](LICENSE).
 
-## Working in PyCharm
-1. Open the project directory in PyCharm.
-2. Configure the interpreter to use the `venv` created above.
-3. Create a run configuration that launches `main.py`.
-4. Run or debug the application directly from the IDE.
+## Credits
+Developed by [marlefranco](https://github.com/marlefranco) and contributors.
 
----
+## Support
+Please use the issue tracker on GitHub to report problems or request features.
 
-Let me know if you need additional clarifications or enhancements! 😊
+## Project Status
+Active development
+
