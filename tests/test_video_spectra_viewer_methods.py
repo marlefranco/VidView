@@ -25,12 +25,12 @@ def load_viewer(monkeypatch):
         "cv2",
         types.SimpleNamespace(VideoCapture=lambda *a, **k: types.SimpleNamespace(isOpened=lambda: True, get=lambda *args: 0, read=lambda: (False, None))),
     )
-    monkeypatch.setitem(sys.modules, "PyQt5", types.SimpleNamespace(QtCore=qtcore, QtGui=qtgui, QtWidgets=qtwidgets))
-    monkeypatch.setitem(sys.modules, "PyQt5.QtCore", qtcore)
-    monkeypatch.setitem(sys.modules, "PyQt5.QtGui", qtgui)
-    monkeypatch.setitem(sys.modules, "PyQt5.QtWidgets", qtwidgets)
+    monkeypatch.setitem(sys.modules, "PyQt6", types.SimpleNamespace(QtCore=qtcore, QtGui=qtgui, QtWidgets=qtwidgets))
+    monkeypatch.setitem(sys.modules, "PyQt6.QtCore", qtcore)
+    monkeypatch.setitem(sys.modules, "PyQt6.QtGui", qtgui)
+    monkeypatch.setitem(sys.modules, "PyQt6.QtWidgets", qtwidgets)
     monkeypatch.setitem(sys.modules, "matplotlib", types.SimpleNamespace(use=lambda *a, **k: None))
-    monkeypatch.setitem(sys.modules, "matplotlib.backends.backend_qt5agg", types.SimpleNamespace(FigureCanvasQTAgg=object))
+    monkeypatch.setitem(sys.modules, "matplotlib.backends.backend_qtagg", types.SimpleNamespace(FigureCanvasQTAgg=object))
     monkeypatch.setitem(sys.modules, "matplotlib.figure", types.SimpleNamespace(Figure=object))
 
     module = importlib.import_module("viewer.video_spectra_viewer")
