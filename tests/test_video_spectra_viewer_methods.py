@@ -64,3 +64,26 @@ def test_show_next_frame_calls_update(monkeypatch):
 
     assert viewer.current_frame_index == 1
     assert called.get("update")
+
+
+def test_plot_title_includes_integration_time(monkeypatch):
+    VideoSpectraViewer, _ = load_viewer(monkeypatch)
+    viewer = VideoSpectraViewer.__new__(VideoSpectraViewer)
+
+    captured = {}
+    axis = types.SimpleNamespace(
+        plot=lambda *a, **k: None,
+        set_xlabel=lambda *a, **k: None,
+        set_ylabel=lambda *a, **k: None,
+        set_title=lambda text: captured.setdefault("title", text),
+    )
+    viewer.figure = types.SimpleNamespace(
+        clear=lambda: None,
+        add_subplot=lambda *a, **k: axis,
+    )
+    viewer.canvas = types.SimpleNamespace(draw=lambda: None)
+
+    spectra = {"timestamp": 1.0, "IntegrationTime": 50, "500": 0.1}
+    viewer._plot_spectra(spectra)
+
+    assert "Integration" in captured.get("title", "")

@@ -213,6 +213,10 @@ class MainViewerWindow(QMainWindow):
         self.ax.clear()
         self._plot_spectra(row)
         title = f"Spectrum at {row['timestamp']}"
+        integration = row.get('IntegrationTime')
+        if integration is not None and not pd.isna(integration):
+            title += f" (Integration: {integration})"
+
         subtitle = (
             f"Spec Row {row_index + 1}/{len(self.spectral_df)} "
             f"Frame {self.current_frame + 1}/{self.total_frames}"
