@@ -61,6 +61,8 @@ class MainViewerWindow(QMainWindow):
         self.canvas = FigureCanvas(self.figure)
         self.ax = self.figure.add_subplot(111)
 
+        self._apply_dark_theme()
+
         plot_layout = self.ui.plotWidget.layout()
         if plot_layout is None:
             plot_layout = QVBoxLayout(self.ui.plotWidget)
@@ -85,6 +87,18 @@ class MainViewerWindow(QMainWindow):
             self.ui.analyzeButton.clicked.connect(self.analyze_data)
 
         self.display_row(0)
+
+    def _apply_dark_theme(self) -> None:
+        """Configure the matplotlib plot with a dark theme."""
+        bg_color = "#2b2b2b"
+        self.figure.set_facecolor(bg_color)
+        self.ax.set_facecolor(bg_color)
+        for spine in self.ax.spines.values():
+            spine.set_color("white")
+        if hasattr(self.ax, "tick_params"):
+            self.ax.tick_params(colors="white", labelcolor="white")
+        self.ax.set_xlabel("Wavelength", color="white")
+        self.ax.set_ylabel("Intensity", color="white")
 
     # ------------------------------------------------------------------
     # Data Import Actions
@@ -211,6 +225,7 @@ class MainViewerWindow(QMainWindow):
 
     def update_spectrum_row(self, row_index: int, row: pd.Series) -> None:
         self.ax.clear()
+        self._apply_dark_theme()
         self._plot_spectra(row)
         title = f"Spectrum at {row['timestamp']}"
         integration = row.get('IntegrationTime')
@@ -221,7 +236,7 @@ class MainViewerWindow(QMainWindow):
             f"Spec Row {row_index + 1}/{len(self.spectral_df)} "
             f"Frame {self.current_frame + 1}/{self.total_frames}"
         )
-        self.ax.set_title(f"{title}\n{subtitle}")
+        self.ax.set_title(f"{title}\n{subtitle}", color="white")
         self.canvas.draw()
 
     def update_metadata_table(self, index: int) -> None:
@@ -284,7 +299,8 @@ class MainViewerWindow(QMainWindow):
             keys.append(k)
         keys = sorted(keys, key=float)
         values = [float(spectra_row[k]) for k in keys]
-        self.ax.plot([float(k) for k in keys], values)
+        line_color = "#66b3ff"
+        self.ax.plot([float(k) for k in keys], values, color=line_color)
 
     def _save_current_metadata(self) -> None:
         for col_idx, col in enumerate(self.metadata_df.columns):
