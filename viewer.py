@@ -24,6 +24,53 @@ from output_writer import write_csv
 from ui.main_window import Ui_MainViewerWindow
 from constants import TS_FORMAT
 
+import csv
+from typing import Dict, List, Iterable, Any, Optional
+
+try:  # optional numpy/scipy dependencies
+    import numpy as np  # type: ignore
+except Exception:  # pragma: no cover - numpy optional
+    np = None  # type: ignore
+try:
+    from scipy.signal import firwin, lfilter  # type: ignore
+except Exception:  # pragma: no cover - fallback if SciPy missing
+    firwin = None
+    lfilter = None
+
+
+def apply_fir_filter(
+    data: Iterable[Iterable[float]],
+    sample_rate: float,
+    cutoff_freq: float,
+    numtaps: int = 100,
+) -> Any:
+    """Applies an FIR filter to smooth spectral data."""
+
+    rows = [list(map(float, row)) for row in data]
+
+    if np is not None and firwin is not None and lfilter is not None:
+        arr = np.asarray(rows, dtype=float)
+        if arr.ndim == 1:
+            arr = arr.reshape(1, -1)
+        nyquist_rate = sample_rate / 2.0
+        fir_coeff = firwin(numtaps, cutoff_freq / nyquist_rate)
+        return np.apply_along_axis(
+            lambda row: lfilter(fir_coeff, 1.0, row), axis=1, arr=arr
+        )
+
+    coeffs = [1.0 / numtaps] * numtaps
+
+    def smooth_row(row: List[float]) -> List[float]:
+        padding = numtaps // 2
+        padded = [row[0]] * padding + row + [row[-1]] * padding
+        result = []
+        for i in range(len(row)):
+            window = padded[i : i + numtaps]
+            result.append(sum(c * x for c, x in zip(coeffs, window)))
+        return result
+
+    return [smooth_row(row) for row in rows]
+
 
 class MainViewerWindow(QMainWindow):
     """Main application window.
@@ -56,6 +103,8 @@ class MainViewerWindow(QMainWindow):
         self.frame_times = parse_frame_times(self.frame_times_path)
         self.spectral_df = parse_spectral_data(self.spectral_path)
         self.metadata_df = parse_metadata(self.metadata_path, len(self.frame_times))
+        dark_path = Path(__file__).resolve().with_name("darkreferencelog.txt")
+        self.dark_reference = self._load_dark_reference(dark_path)
 
         self.figure = Figure()
         self.canvas = FigureCanvas(self.figure)
@@ -99,6 +148,32 @@ class MainViewerWindow(QMainWindow):
             self.ax.tick_params(colors="white", labelcolor="white")
         self.ax.set_xlabel("Wavelength", color="white")
         self.ax.set_ylabel("Intensity", color="white")
+
+    def _load_dark_reference(self, path: Path) -> Dict[float, List[float]]:
+        """Load dark reference data keyed by integration time."""
+        if not path.exists():
+            return {}
+        data: Dict[float, List[float]] = {}
+        with open(path, newline="", encoding="utf-8") as fh:
+            reader = csv.DictReader(fh)
+            for row in reader:
+                integration: Optional[float] = None
+                intensities: List[float] = []
+                for key, value in row.items():
+                    lname = key.lower().replace(" ", "")
+                    if lname in {"integrationtime", "integration_time", "integration"}:
+                        try:
+                            integration = float(value)
+                        except (TypeError, ValueError):
+                            integration = None
+                    elif lname != "timestamp":
+                        try:
+                            intensities.append(float(value))
+                        except (TypeError, ValueError):
+                            intensities.append(float("nan"))
+                if integration is not None:
+                    data[integration] = intensities
+        return data
 
     # ------------------------------------------------------------------
     # Data Import Actions
@@ -298,9 +373,35 @@ class MainViewerWindow(QMainWindow):
                 continue
             keys.append(k)
         keys = sorted(keys, key=float)
-        values = [float(spectra_row[k]) for k in keys]
+        y = [float(spectra_row[k]) for k in keys]
+
+        integration = None
+        for col in spectra_row.index:
+            lname = str(col).lower().replace(" ", "")
+            if lname in {"integrationtime", "integration_time", "integration"}:
+                try:
+                    integration = float(spectra_row[col])
+                except (TypeError, ValueError):
+                    integration = None
+                break
+
+        dark = None
+        if integration is not None:
+            dark = self.dark_reference.get(float(integration))
+        if dark and len(dark) == len(y):
+            data_subtracted = [val - d for val, d in zip(y, dark)]
+        else:
+            data_subtracted = y
+
+        filtered_result = apply_fir_filter([data_subtracted], 2047, 10, 101)
+        filtered_row = filtered_result[0]
+        if np is not None and hasattr(filtered_row, "tolist"):
+            y_plot = filtered_row.tolist()
+        else:
+            y_plot = list(filtered_row)
+
         line_color = "#66b3ff"
-        self.ax.plot([float(k) for k in keys], values, color=line_color)
+        self.ax.plot([float(k) for k in keys], y_plot, color=line_color)
 
     def _save_current_metadata(self) -> None:
         for col_idx, col in enumerate(self.metadata_df.columns):
