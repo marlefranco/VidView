@@ -5,10 +5,21 @@ from __future__ import annotations
 import csv
 import os
 from dataclasses import dataclass, field
-from typing import List, Dict
+from typing import List, Dict, Iterable, Any, Optional
+import math
+from pathlib import Path
 
 import cv2
 import matplotlib
+try:
+    import numpy as np  # type: ignore
+except Exception:  # pragma: no cover - numpy optional
+    np = None  # type: ignore
+try:  # optional SciPy dependency
+    from scipy.signal import firwin, lfilter  # type: ignore
+except Exception:  # pragma: no cover - fallback if SciPy missing
+    firwin = None
+    lfilter = None
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from PyQt6 import QtCore, QtGui, QtWidgets
@@ -16,7 +27,59 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 from .data_utils import read_csv_file, nearest_by_timestamp
 
 # Ensure using non-interactive backend for embedding in PyQt6
+
 matplotlib.use("Agg")
+
+
+def apply_fir_filter(
+    data: Iterable[Iterable[float]],
+    sample_rate: float,
+    cutoff_freq: float,
+    numtaps: int = 100,
+) -> Any:
+    """Applies an FIR filter to smooth spectral data."""
+
+    rows = [list(map(float, row)) for row in data]
+
+    if np is not None and firwin is not None and lfilter is not None:
+        arr = np.asarray(rows, dtype=float)
+        if arr.ndim == 1:
+            arr = arr.reshape(1, -1)
+        nyquist_rate = sample_rate / 2.0
+        fir_coeff = firwin(numtaps, cutoff_freq / nyquist_rate)
+        return np.apply_along_axis(
+            lambda row: lfilter(fir_coeff, 1.0, row), axis=1, arr=arr
+        )
+
+    nyquist_rate = sample_rate / 2.0
+    norm_cutoff = cutoff_freq / nyquist_rate
+    M = numtaps - 1
+    coeffs: List[float] = []
+    for n in range(numtaps):
+        if n == M / 2:
+            val = 2 * norm_cutoff
+        else:
+            val = math.sin(2 * math.pi * norm_cutoff * (n - M / 2)) / (
+                math.pi * (n - M / 2)
+            )
+        window = 0.54 - 0.46 * math.cos(2 * math.pi * n / M)
+        coeffs.append(val * window)
+    norm = sum(coeffs) or 1.0
+    coeffs = [c / norm for c in coeffs]
+
+    def smooth_row(row: List[float]) -> List[float]:
+        padding = numtaps - 1
+        padded = [row[0]] * padding + row
+        result = []
+        for i in range(len(row)):
+            acc = 0.0
+            for k, c in enumerate(coeffs):
+                acc += c * padded[i + padding - k]
+            result.append(acc)
+        return result
+
+    return [smooth_row(r) for r in rows]
+
 
 
 
@@ -36,6 +99,8 @@ class VideoSpectraViewer(QtWidgets.QMainWindow):
         self.video_path = video_path
         self.spectra_data = read_csv_file(spectra_path)
         self.control_log: List[FrameMetadata] = []
+        dark_path = Path(__file__).resolve().parent.parent / "darkreferencelog.txt"
+        self.dark_reference = self._load_dark_reference(dark_path)
 
         if control_log_path and os.path.exists(control_log_path):
             raw_logs = read_csv_file(control_log_path)
@@ -140,6 +205,32 @@ class VideoSpectraViewer(QtWidgets.QMainWindow):
 
         return nearest_by_timestamp(self.spectra_data, timestamp)
 
+    def _load_dark_reference(self, path: Path) -> Dict[float, List[float]]:
+        """Load dark reference data keyed by integration time."""
+        if not path.exists():
+            return {}
+        data: Dict[float, List[float]] = {}
+        with open(path, newline="", encoding="utf-8") as fh:
+            reader = csv.DictReader(fh)
+            for row in reader:
+                integration: Optional[float] = None
+                intensities: List[float] = []
+                for key, value in row.items():
+                    lname = key.lower().replace(" ", "")
+                    if lname in {"integrationtime", "integration_time", "integration"}:
+                        try:
+                            integration = float(value)
+                        except (TypeError, ValueError):
+                            integration = None
+                    elif lname != "timestamp":
+                        try:
+                            intensities.append(float(value))
+                        except (TypeError, ValueError):
+                            intensities.append(float("nan"))
+                if integration is not None:
+                    data[integration] = intensities
+        return data
+
     def _plot_spectra(self, spectra: Dict[str, float]) -> None:
         """Plot spectral data on matplotlib canvas."""
         self.figure.clear()
@@ -150,9 +241,33 @@ class VideoSpectraViewer(QtWidgets.QMainWindow):
         if hasattr(ax, "set_facecolor"):
             ax.set_facecolor(bg_color)
 
-        x = [k for k in spectra.keys() if k != "timestamp"]
+        x = [k for k in spectra.keys() if k != "timestamp" and "integration" not in k.lower()]
         y = [spectra[k] for k in x]
-        ax.plot(x, y, marker="o", color=line_color)
+
+        integration = None
+        for key in spectra:
+            lowered = key.lower().replace(" ", "")
+            if lowered in {"integrationtime", "integration_time", "integration"}:
+                integration = spectra.get(key)
+                break
+
+        dark = None
+        if integration is not None:
+            dark_map = getattr(self, "dark_reference", {})
+            if isinstance(dark_map, dict):
+                dark = dark_map.get(float(integration))
+        if dark and len(dark) == len(y):
+            data_subtracted = [val - d for val, d in zip(y, dark)]
+        else:
+            data_subtracted = y
+
+        filtered_result = apply_fir_filter([data_subtracted], 2047, 10, 101)
+        filtered_row = filtered_result[0]
+        if np is not None and hasattr(filtered_row, "tolist"):
+            y_plot = filtered_row.tolist()
+        else:
+            y_plot = list(filtered_row)
+        ax.plot(x, y_plot, marker="o", color=line_color)
         ax.set_xlabel("Wavelength", color="white")
         ax.set_ylabel("Intensity", color="white")
         if hasattr(ax, "tick_params"):
@@ -161,13 +276,8 @@ class VideoSpectraViewer(QtWidgets.QMainWindow):
             spine.set_color("white")
 
         title = f"Timestamp: {spectra['timestamp']:.2f}s"
-        for key in spectra:
-            lowered = key.lower().replace(" ", "")
-            if lowered in {"integrationtime", "integration_time"}:
-                integration = spectra.get(key)
-                if integration is not None and integration == integration:
-                    title += f" | Integration: {integration}"
-                break
+        if integration is not None and integration == integration:
+            title += f" | Integration: {integration}"
 
         ax.set_title(title)
         if hasattr(ax, "title") and hasattr(ax.title, "set_color"):
