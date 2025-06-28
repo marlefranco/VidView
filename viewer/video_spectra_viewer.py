@@ -144,7 +144,17 @@ class VideoSpectraViewer(QtWidgets.QMainWindow):
         ax.plot(x, y, marker="o")
         ax.set_xlabel("Wavelength")
         ax.set_ylabel("Intensity")
-        ax.set_title(f"Timestamp: {spectra['timestamp']:.2f}s")
+
+        title = f"Timestamp: {spectra['timestamp']:.2f}s"
+        for key in spectra:
+            lowered = key.lower().replace(" ", "")
+            if lowered in {"integrationtime", "integration_time"}:
+                integration = spectra.get(key)
+                if integration is not None and integration == integration:
+                    title += f" | Integration: {integration}"
+                break
+
+        ax.set_title(title)
         self.canvas.draw()
 
     # -------------------------- Metadata Handling --------------------------
