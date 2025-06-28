@@ -73,6 +73,11 @@ class VideoSpectraViewer(QtWidgets.QMainWindow):
         self.canvas = FigureCanvas(self.figure)
         video_plot_layout.addWidget(self.canvas)
 
+        # apply a dark theme to the plot area
+        bg_color = "#2b2b2b"
+        self.figure.set_facecolor(bg_color)
+        self.canvas.setStyleSheet(f"background-color: {bg_color};")
+
         video_plot_layout.setStretch(0, 1)
         video_plot_layout.setStretch(1, 1)
         layout.addLayout(video_plot_layout)
@@ -139,11 +144,21 @@ class VideoSpectraViewer(QtWidgets.QMainWindow):
         """Plot spectral data on matplotlib canvas."""
         self.figure.clear()
         ax = self.figure.add_subplot(111)
+        bg_color = "#2b2b2b"
+        line_color = "#66b3ff"
+
+        if hasattr(ax, "set_facecolor"):
+            ax.set_facecolor(bg_color)
+
         x = [k for k in spectra.keys() if k != "timestamp"]
         y = [spectra[k] for k in x]
-        ax.plot(x, y, marker="o")
-        ax.set_xlabel("Wavelength")
-        ax.set_ylabel("Intensity")
+        ax.plot(x, y, marker="o", color=line_color)
+        ax.set_xlabel("Wavelength", color="white")
+        ax.set_ylabel("Intensity", color="white")
+        if hasattr(ax, "tick_params"):
+            ax.tick_params(colors="white", labelcolor="white")
+        for spine in getattr(ax, "spines", {}).values():
+            spine.set_color("white")
 
         title = f"Timestamp: {spectra['timestamp']:.2f}s"
         for key in spectra:
@@ -155,6 +170,8 @@ class VideoSpectraViewer(QtWidgets.QMainWindow):
                 break
 
         ax.set_title(title)
+        if hasattr(ax, "title") and hasattr(ax.title, "set_color"):
+            ax.title.set_color("white")
         self.canvas.draw()
 
     # -------------------------- Metadata Handling --------------------------
