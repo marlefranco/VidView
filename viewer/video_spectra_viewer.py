@@ -7,9 +7,11 @@ import os
 from dataclasses import dataclass, field
 from typing import List, Dict, Iterable, Any, Optional
 from pathlib import Path
+from datetime import datetime
 
 import cv2
 import matplotlib
+from constants import TS_FORMAT
 try:
     import numpy as np  # type: ignore
 except Exception:  # pragma: no cover - numpy optional
@@ -41,23 +43,35 @@ def apply_fir_filter(
     rows = [list(map(float, row)) for row in data]
 
     if np is not None and firwin is not None and lfilter is not None:
+        # Use numpy for efficient filtering
         arr = np.asarray(rows, dtype=float)
         if arr.ndim == 1:
             arr = arr.reshape(1, -1)
         nyquist_rate = sample_rate / 2.0
-        fir_coeff = firwin(numtaps, cutoff_freq / nyquist_rate)
+        # Cache the filter coefficients for repeated calls with the same parameters
+        if not hasattr(apply_fir_filter, 'fir_coeff_cache'):
+            apply_fir_filter.fir_coeff_cache = {}
+        cache_key = (sample_rate, cutoff_freq, numtaps)
+        if cache_key not in apply_fir_filter.fir_coeff_cache:
+            apply_fir_filter.fir_coeff_cache[cache_key] = firwin(numtaps, cutoff_freq / nyquist_rate)
+        fir_coeff = apply_fir_filter.fir_coeff_cache[cache_key]
+
+        # Apply filter to all rows at once for better performance
         return np.apply_along_axis(
             lambda row: lfilter(fir_coeff, 1.0, row), axis=1, arr=arr
         )
 
+    # Fallback implementation for when numpy/scipy are not available
     coeffs = [1.0 / numtaps] * numtaps
 
     def smooth_row(row: List[float]) -> List[float]:
         padding = numtaps // 2
         padded = [row[0]] * padding + row + [row[-1]] * padding
         result = []
-        for i in range(len(row)):
-            window = padded[i : i + numtaps]
+        # Pre-calculate window indices for better performance
+        windows = [padded[i:i + numtaps] for i in range(len(row))]
+        for window in windows:
+            # Use sum() instead of generator expression for better performance
             result.append(sum(c * x for c, x in zip(coeffs, window)))
         return result
 
@@ -77,13 +91,28 @@ class FrameMetadata:
 class VideoSpectraViewer(QtWidgets.QMainWindow):
     """Main window displaying video frames with spectral data."""
 
-    def __init__(self, video_path: str, spectra_path: str, control_log_path: str | None = None):
+    def __init__(self, video_path: str, spectra_path: str, control_log_path: str | None = None, frame_times_path: str | None = None):
         super().__init__()
         self.video_path = video_path
         self.spectra_data = read_csv_file(spectra_path)
         self.control_log: List[FrameMetadata] = []
         dark_path = Path(__file__).resolve().parent.parent / "darkreferencelog.txt"
         self.dark_reference = self._load_dark_reference(dark_path)
+
+        # Load frame times if provided, otherwise use default
+        if frame_times_path is None:
+            # Try to find frame_times.txt in the same directory as the video
+            video_dir = Path(video_path).parent
+            default_frame_times = video_dir / "frame_times.txt"
+            if default_frame_times.exists():
+                frame_times_path = str(default_frame_times)
+            else:
+                # Fall back to ExampleFiles
+                frame_times_path = str(Path(__file__).resolve().parent.parent / "ExampleFiles" / "frame_times.txt")
+
+        # Initialize frame times model
+        from .models import FrameTimesModel
+        self.frame_times_model = FrameTimesModel(frame_times_path)
 
         if control_log_path and os.path.exists(control_log_path):
             raw_logs = read_csv_file(control_log_path)
@@ -98,17 +127,25 @@ class VideoSpectraViewer(QtWidgets.QMainWindow):
         self.total_frames = int(self.video.get(cv2.CAP_PROP_FRAME_COUNT))
         self.fps = self.video.get(cv2.CAP_PROP_FPS)
         self.current_frame_index = 0
+        self.current_spectra_index = 0
 
         self._init_ui()
         self._update_display()
 
     # -------------------------- UI Setup --------------------------
     def _init_ui(self) -> None:
-        self.setWindowTitle("Video Spectra Viewer")
+        from viewer import __version__
+        self.setWindowTitle(f"Video Spectra Viewer v{__version__}")
         central_widget = QtWidgets.QWidget()
         self.setCentralWidget(central_widget)
 
         layout = QtWidgets.QVBoxLayout(central_widget)
+
+        # Add header with version number
+        header_label = QtWidgets.QLabel(f"Video Spectra Viewer - Version {__version__}")
+        header_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        header_label.setStyleSheet("font-size: 14pt; font-weight: bold; margin: 5px;")
+        layout.addWidget(header_label)
 
         video_plot_layout = QtWidgets.QHBoxLayout()
 
@@ -155,17 +192,44 @@ class VideoSpectraViewer(QtWidgets.QMainWindow):
 
     # -------------------------- Frame Display Logic --------------------------
     def _update_display(self) -> None:
-        """Load and display the current frame and corresponding spectra."""
-        self.video.set(cv2.CAP_PROP_POS_FRAMES, self.current_frame_index)
+        """Load and display the current frame and corresponding spectra with optimized performance."""
+        # Get the current spectral data
+        if self.current_spectra_index < 0 or self.current_spectra_index >= len(self.spectra_data):
+            self.current_spectra_index = 0
+
+        current_spectra = self.spectra_data[self.current_spectra_index]
+        spectra_timestamp = current_spectra.get("timestamp", 0.0)
+
+        # Find the frame index closest to the spectral data timestamp
+        self.current_frame_index = self._find_nearest_frame_index(str(spectra_timestamp))
+
+        # Check if we're requesting the next sequential frame to avoid seeking
+        if not hasattr(self, '_last_frame_index') or self._last_frame_index != self.current_frame_index - 1:
+            self.video.set(cv2.CAP_PROP_POS_FRAMES, self.current_frame_index)
+        self._last_frame_index = self.current_frame_index
+
         ret, frame = self.video.read()
         if not ret:
             self.status_bar.showMessage("Failed to read frame")
             return
 
+        # Get the frame time for the current frame
+        frame_time = self.frame_times_model.get_frame_time(self.current_frame_index)
+
+        # Add frame time overlay to the bottom center of the frame
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        text = frame_time
+        text_size = cv2.getTextSize(text, font, 0.7, 2)[0]
+        text_x = (frame.shape[1] - text_size[0]) // 2  # Center horizontally
+        text_y = frame.shape[0] - 20  # 20 pixels from the bottom
+        cv2.putText(frame, text, (text_x, text_y), font, 0.7, (0, 255, 0), 2)  # Green color (0, 255, 0)
+
         # Convert BGR to RGB for Qt
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         h, w, ch = frame_rgb.shape
         bytes_per_line = ch * w
+
+        # Create QImage from frame data
         qt_image = QtGui.QImage(
             frame_rgb.data,
             w,
@@ -173,20 +237,55 @@ class VideoSpectraViewer(QtWidgets.QMainWindow):
             bytes_per_line,
             QtGui.QImage.Format.Format_RGB888,
         )
+
+        # Cache the label size to avoid repeated calls
+        if not hasattr(self, '_label_size') or self._label_size != self.video_label.size():
+            self._label_size = self.video_label.size()
+
+        # Create pixmap from QImage
         pixmap = QtGui.QPixmap.fromImage(qt_image)
+
+        # Only scale if necessary (when the image is larger than the label)
+        if (w > self._label_size.width() or h > self._label_size.height()):
+            pixmap = pixmap.scaled(
+                self._label_size,
+                QtCore.Qt.AspectRatioMode.KeepAspectRatio,
+                QtCore.Qt.TransformationMode.SmoothTransformation,
+            )
+
         self.video_label.setPixmap(pixmap)
 
-        timestamp = self.current_frame_index / self.fps
-        spectra = self._get_nearest_spectra(timestamp)
-        self._plot_spectra(spectra)
-        self._update_metadata_table(timestamp)
+        # Use the current spectral data directly instead of looking it up again
+        self._cached_spectra = current_spectra
+        self._cached_timestamp = spectra_timestamp
 
-        self.status_bar.showMessage(f"Frame {self.current_frame_index+1}/{self.total_frames}")
+        # Update plot and metadata with cached data
+        self._plot_spectra(self._cached_spectra)
+        self._update_metadata_table(spectra_timestamp)
+
+        # Update status message
+        self.status_bar.showMessage(f"Frame {self.current_frame_index+1}/{self.total_frames} | Spectra {self.current_spectra_index+1}/{len(self.spectra_data)}")
 
     def _get_nearest_spectra(self, timestamp: float) -> Dict[str, float]:
         """Return spectral row with timestamp closest to ``timestamp``."""
 
         return nearest_by_timestamp(self.spectra_data, timestamp)
+
+    def _find_nearest_frame_index(self, timestamp: str) -> int:
+        """Find the index of the frame with the timestamp closest to the given timestamp.
+
+        Parameters
+        ----------
+        timestamp : str
+            Timestamp to find the nearest frame for.
+
+        Returns
+        -------
+        int
+            Index of the nearest frame.
+        """
+        # Use the FrameTimesModel to find the nearest frame index
+        return self.frame_times_model.find_nearest_frame_index(timestamp)
 
     def _load_dark_reference(self, path: Path) -> Dict[float, List[float]]:
         """Load dark reference data keyed by integration time."""
@@ -307,14 +406,14 @@ class VideoSpectraViewer(QtWidgets.QMainWindow):
     # -------------------------- Button Actions --------------------------
     def show_next_frame(self) -> None:
         self._save_metadata_from_table()
-        if self.current_frame_index < self.total_frames - 1:
-            self.current_frame_index += 1
+        if self.current_spectra_index < len(self.spectra_data) - 1:
+            self.current_spectra_index += 1
             self._update_display()
 
     def show_prev_frame(self) -> None:
         self._save_metadata_from_table()
-        if self.current_frame_index > 0:
-            self.current_frame_index -= 1
+        if self.current_spectra_index > 0:
+            self.current_spectra_index -= 1
             self._update_display()
 
     def save_metadata(self) -> None:
@@ -355,10 +454,11 @@ def main() -> None:
     parser.add_argument("video", help="Path to video file")
     parser.add_argument("spectra", help="Path to spectral data CSV")
     parser.add_argument("--controls", help="Path to control inputs log", default=None)
+    parser.add_argument("--frame-times", help="Path to frame times file", default=None)
     args = parser.parse_args()
 
     app = QtWidgets.QApplication([])
-    viewer = VideoSpectraViewer(args.video, args.spectra, args.controls)
+    viewer = VideoSpectraViewer(args.video, args.spectra, args.controls, args.frame_times)
     viewer.show()
     app.exec()
 

@@ -124,3 +124,4 @@ cython_debug/
 # Windows
 Thumbs.db
 
+/ExampleFiles/output.txt

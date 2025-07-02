@@ -48,9 +48,9 @@ def test_main_init_failure(monkeypatch):
     monkeypatch.setitem(sys.modules, 'matplotlib.figure', types.SimpleNamespace(Figure=object))
     monkeypatch.setitem(sys.modules, 'pandas', types.SimpleNamespace())
 
-    spec = importlib.util.spec_from_file_location('viewer', Path('viewer.py'))
-    viewer_mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(viewer_mod)
+    # Mock the viewer package
+    viewer_mod = types.ModuleType('viewer')
+    viewer_mod.MainViewerWindow = lambda *args, **kwargs: None
     monkeypatch.setitem(sys.modules, 'viewer', viewer_mod)
 
     main = importlib.reload(importlib.import_module('main'))

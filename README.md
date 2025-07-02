@@ -1,4 +1,4 @@
-# Video Spectra Viewer
+# Video Spectra Viewer (v1.0.0)
 
 A desktop application for inspecting video frames alongside synchronized spectral data. It allows interactive navigation through frames, editing per-frame metadata, and exporting combined data to CSV files.
 
@@ -13,11 +13,51 @@ A desktop application for inspecting video frames alongside synchronized spectra
 - [Credits](#credits)
 - [Support](#support)
 - [Project Status](#project-status)
+- [Version](#version)
 
 ## Overview
 Video Spectra Viewer loads a video together with corresponding frame timestamps, spectral readings and metadata. The application synchronises these data sources so you can step through the video frame by frame while inspecting the nearest spectral measurement. Edited metadata and spectra can be exported for further analysis.
 
 ## Installation
+
+### Option 1: Install as a Python package (recommended)
+1. Create and activate a Python virtual environment.
+2. Install the package:
+   ```bash
+   pip install .
+   ```
+   This will install the application and all its dependencies.
+3. Run the application using the command:
+   ```bash
+   vidview
+   ```
+
+### Option 2: Create a standalone executable
+1. Create and activate a Python virtual environment.
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. If you encounter an error about the 'typing' package being incompatible with PyInstaller, you can fix it in one of two ways:
+
+   **Option A**: Run the provided batch file (Windows only):
+   ```
+   fix_pyinstaller_typing_issue.bat
+   ```
+
+   **Option B**: Manually uninstall the package:
+   ```bash
+   pip uninstall -y typing
+   ```
+
+   This issue occurs because the 'typing' package is an obsolete backport of a standard library package in newer Python versions.
+4. Use PyInstaller to create a standalone executable:
+   ```bash
+   pyinstaller --name=VidView --windowed --add-data "ExampleFiles;ExampleFiles" --add-data "ui;ui" --add-data "*.png;." main.py
+   ```
+5. The executable will be created in the `dist/VidView` directory.
+
+### Option 3: Run from source
 1. Create and activate a Python virtual environment.
 2. Install dependencies:
    ```bash
@@ -27,12 +67,26 @@ Video Spectra Viewer loads a video together with corresponding frame timestamps,
    ```bash
    ./generate_ui_py.sh
    ```
+4. Run the application:
+   ```bash
+   python main.py
+   ```
+
+   On Windows, you can also double-click the `vidview.bat` file to run the application.
 
 ## Usage
 Run the GUI application:
+
+If installed as a package:
+```bash
+vidview
+```
+
+If running from source:
 ```bash
 python main.py
 ```
+
 Without arguments the viewer loads sample data from the `ExampleFiles/` directory. Use the **Import Data** button to load your own dataset (video, frame times, spectral data and metadata). Navigate with **Next** and **Previous** to review frames, update the metadata table and export the results with **Export Metadata**.
 
 The `viewer/video_spectra_viewer.py` module also exposes a command line interface:
@@ -69,3 +123,5 @@ Please use the issue tracker on GitHub to report problems or request features.
 ## Project Status
 Active development
 
+## Version
+Current version: 1.0.0

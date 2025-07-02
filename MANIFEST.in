@@ -1,0 +1,6 @@
+include requirements.txt
+include LICENSE
+include README.md
+include *.png
+include ui/*.ui
+recursive-include ExampleFiles *

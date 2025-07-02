@@ -1,52 +1,40 @@
 import ast
+import inspect
 from pathlib import Path
+from viewer import MainViewerWindow
 
 def test_viewer_syntax():
-    source = Path('viewer.py').read_text()
-    ast.parse(source)
+    # Test that the MainViewerWindow class can be imported
+    assert inspect.isclass(MainViewerWindow)
 
 
 def test_export_csv_default_path():
-    source = Path('viewer.py').read_text()
-    tree = ast.parse(source)
-
-    cls = next(
-        node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == 'MainViewerWindow'
-    )
-    func = next(
-        node for node in cls.body if isinstance(node, ast.FunctionDef) and node.name == 'export_csv'
-    )
-
-    # first argument after 'self'
-    assert func.args.args[1].arg == 'path'
-    assert isinstance(func.args.defaults[0], ast.Constant)
-    assert func.args.defaults[0].value == 'output.csv'
+    # Check that export_csv method has a default path parameter of 'output.csv'
+    signature = inspect.signature(MainViewerWindow.export_csv)
+    path_param = signature.parameters.get('path')
+    assert path_param is not None
+    assert path_param.default == 'output.csv'
 
 
-def test_export_csv_functionality(tmp_path, monkeypatch):
-    source = Path('viewer.py').read_text()
-    tree = ast.parse(source)
-    cls = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == 'MainViewerWindow')
-    func = next(node for node in cls.body if isinstance(node, ast.FunctionDef) and node.name == 'export_csv')
+def test_export_csv_functionality(monkeypatch):
+    # Test the functionality of the export_csv method
+    from viewer.controllers import VideoSpectraController
 
-    module = ast.Module([func], [])
-    ast.fix_missing_locations(module)
-    namespace = {}
-    exec(compile(module, filename="<export_csv>", mode="exec"), namespace)
-    export_csv = namespace['export_csv']
-
+    # Create a mock controller
     called = {}
-    def fake_write_csv(path, frame_times, spectral_df, metadata_df):
+    def fake_export_csv(self, path):
         called['path'] = path
-        called['frame_times'] = frame_times
 
-    export_csv.__globals__['write_csv'] = fake_write_csv
+    # Patch the export_csv method in the controller
+    monkeypatch.setattr(VideoSpectraController, 'export_csv', fake_export_csv)
 
-    dummy = type('Dummy', (), {
-        'frame_times': [1],
-        'spectral_df': None,
-        'metadata_df': None,
-    })()
+    # Create a dummy MainViewerWindow instance with a mocked controller
+    dummy = MainViewerWindow.__new__(MainViewerWindow)
+    dummy.controller = VideoSpectraController.__new__(VideoSpectraController)
+    dummy.output_path = 'output.csv'
 
-    export_csv(dummy)
+    # Call the export_csv method
+    dummy.export_csv(dummy.output_path)
+
+    # Check that the controller's export_csv method was called with the right path
     assert called['path'] == 'output.csv'
