@@ -72,6 +72,54 @@ def main() -> int:
     """Launch the application and ensure video resources are released."""
     app = QApplication(sys.argv)
 
+    # Apply dark theme to the entire application
+    app.setStyleSheet("""
+        QMainWindow, QWidget {
+            background-color: #2b2b2b;
+            color: white;
+        }
+        QLabel {
+            color: white;
+        }
+        QPushButton {
+            background-color: #3b3b3b;
+            color: white;
+            border: 1px solid #555555;
+            padding: 5px;
+            border-radius: 3px;
+        }
+        QPushButton:hover {
+            background-color: #4b4b4b;
+        }
+        QTableWidget {
+            background-color: #2b2b2b;
+            color: white;
+            gridline-color: #3b3b3b;
+            border: 1px solid #3b3b3b;
+        }
+        QTableWidget::item {
+            background-color: #2b2b2b;
+            color: white;
+        }
+        QHeaderView::section {
+            background-color: #3b3b3b;
+            color: white;
+            border: 1px solid #4b4b4b;
+        }
+        QMenuBar {
+            background-color: #2b2b2b;
+            color: white;
+        }
+        QMenuBar::item {
+            background-color: #2b2b2b;
+            color: white;
+        }
+        QStatusBar {
+            background-color: #2b2b2b;
+            color: white;
+        }
+    """)
+
     # Select data folder
     folder_path = select_data_folder()
     if folder_path is None:

@@ -113,7 +113,7 @@ class Ui_MainViewerWindow(object):
     def retranslateUi(self, MainViewerWindow):
         _translate = QtCore.QCoreApplication.translate
         MainViewerWindow.setWindowTitle(_translate("MainViewerWindow", "Video Spectra Viewer"))
-        self.folderPathLabel.setStyleSheet(_translate("MainViewerWindow", "color: #666666;"))
+        self.folderPathLabel.setStyleSheet(_translate("MainViewerWindow", "color: #cccccc;"))
         self.folderPathLabel.setText(_translate("MainViewerWindow", "Data folder: "))
         self.label_4.setText(_translate("MainViewerWindow", "Video Spectra Viewer - Version 1.0.0"))
         self.label_3.setText(_translate("MainViewerWindow", "Author: Marle Franco "))
