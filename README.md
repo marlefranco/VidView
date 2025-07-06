@@ -75,6 +75,8 @@ Video Spectra Viewer loads a video together with corresponding frame timestamps,
    On Windows, you can also double-click the `vidview.bat` file to run the application.
 
 ## Usage
+
+### GUI Application
 Run the GUI application:
 
 If installed as a package:
@@ -89,6 +91,23 @@ python main.py
 
 Without arguments the viewer loads sample data from the `ExampleFiles/` directory. Use the **Import Data** button to load your own dataset (video, frame times, spectral data and metadata). Navigate with **Next** and **Previous** to review frames, update the metadata table and export the results with **Export Metadata**.
 
+### Batch Processing
+For processing multiple folders without launching the UI, use the batch processor:
+
+```bash
+python batch_processor.py
+```
+
+This script will:
+1. Prompt you to select a parent directory
+2. Find all subfolders within that directory
+3. Process each subfolder that contains the required files (video.avi, frame_times.txt, parsed_data.txt, control_inputs_log.txt)
+4. Generate an output.txt file in each valid subfolder
+5. Display a summary of the processing results
+
+This is useful for batch processing multiple datasets without manual intervention.
+
+### Command Line Interface
 The `viewer/video_spectra_viewer.py` module also exposes a command line interface:
 ```bash
 python viewer/video_spectra_viewer.py <video> <spectra> [--controls CONTROL_LOG]
