@@ -8,11 +8,12 @@ within that directory to generate output.txt files without launching the UI.
 import sys
 import os
 from pathlib import Path
-from typing import List, Tuple, Optional
+from typing import List, Optional
 from PyQt6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
 from output_file import generate_output_file
 from logging_config import get_logger
+from file_utils import check_data_folder
 
 # Create a logger for this module
 logger = get_logger("batch_processor")
@@ -42,34 +43,6 @@ def select_parent_directory() -> Optional[Path]:
 
     return None
 
-def check_data_folder(folder_path: Path) -> Tuple[bool, str, dict]:
-    """Check if the folder contains the required data files.
-
-    Args:
-        folder_path (Path): The folder path to check.
-
-    Returns:
-        Tuple[bool, str, dict]: A tuple containing:
-            - bool: True if all required files exist, False otherwise.
-            - str: Error message if any files are missing.
-            - dict: Dictionary of file paths if all files exist.
-    """
-    required_files = {
-        "video": folder_path / "video.avi",
-        "frame_times": folder_path / "frame_times.txt",
-        "parsed_data": folder_path / "parsed_data.txt",
-        "control_inputs": folder_path / "control_inputs_log.txt"
-    }
-
-    missing_files = []
-    for name, path in required_files.items():
-        if not path.exists():
-            missing_files.append(f"{name} ({path.name})")
-
-    if missing_files:
-        return False, f"Missing required files: {', '.join(missing_files)}", {}
-
-    return True, "", required_files
 
 def get_all_subfolders(parent_dir: Path) -> List[Path]:
     """Get all subfolders in the parent directory.
@@ -92,7 +65,7 @@ def process_folder(folder_path: Path) -> bool:
         bool: True if processing was successful, False otherwise.
     """
     logger.info(f"Processing folder: {folder_path}")
-    
+
     # Check if the folder contains the required files
     valid, error_message, file_paths = check_data_folder(folder_path)
     if not valid:
@@ -117,7 +90,7 @@ def process_folder(folder_path: Path) -> bool:
 def main() -> int:
     """Main function to process all subfolders in the parent directory."""
     app = QApplication(sys.argv)
-    
+
     # Select parent directory
     parent_dir = select_parent_directory()
     if parent_dir is None:
@@ -125,7 +98,7 @@ def main() -> int:
         return 1
 
     logger.info(f"Selected parent directory: {parent_dir}")
-    
+
     # Get all subfolders
     subfolders = get_all_subfolders(parent_dir)
     if not subfolders:
@@ -135,17 +108,17 @@ def main() -> int:
         return 1
 
     logger.info(f"Found {len(subfolders)} subfolders")
-    
+
     # Process each subfolder
     successful_folders = 0
     failed_folders = 0
-    
+
     for folder in subfolders:
         if process_folder(folder):
             successful_folders += 1
         else:
             failed_folders += 1
-    
+
     # Show summary message
     summary = (
         f"Processing complete!\n\n"
@@ -153,10 +126,10 @@ def main() -> int:
         f"Successfully processed: {successful_folders}\n"
         f"Failed to process: {failed_folders}"
     )
-    
+
     logger.info(summary.replace('\n', ' '))
     QMessageBox.information(None, "Processing Complete", summary)
-    
+
     return 0
 
 if __name__ == "__main__":

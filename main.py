@@ -1,13 +1,14 @@
 """Entry point for the Video Spectra Viewer application."""
 import sys
 import os
-from typing import Optional, Tuple
+from typing import Optional
 from pathlib import Path
 from PyQt6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
 from viewer import MainViewerWindow
 from output_file import generate_output_file
 from ui.status_window import StatusWindow
+from file_utils import check_data_folder
 
 
 def select_data_folder() -> Optional[Path]:
@@ -36,36 +37,6 @@ def select_data_folder() -> Optional[Path]:
             return Path(selected_folders[0])
 
     return None
-
-
-def check_data_folder(folder_path: Path) -> Tuple[bool, str, dict]:
-    """Check if the selected folder contains the required data files.
-
-    Args:
-        folder_path (Path): The folder path to check.
-
-    Returns:
-        Tuple[bool, str, dict]: A tuple containing:
-            - bool: True if all required files exist, False otherwise.
-            - str: Error message if any files are missing.
-            - dict: Dictionary of file paths if all files exist.
-    """
-    required_files = {
-        "video": folder_path / "video.avi",
-        "frame_times": folder_path / "frame_times.txt",
-        "parsed_data": folder_path / "parsed_data.txt",
-        "control_inputs": folder_path / "control_inputs_log.txt"
-    }
-
-    missing_files = []
-    for name, path in required_files.items():
-        if not path.exists():
-            missing_files.append(f"{name} ({path.name})")
-
-    if missing_files:
-        return False, f"Missing required files: {', '.join(missing_files)}", {}
-
-    return True, "", required_files
 
 
 def main() -> int:
