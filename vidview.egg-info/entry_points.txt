@@ -1,0 +1,2 @@
+[console_scripts]
+vidview = main:main

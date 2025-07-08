@@ -157,10 +157,68 @@ def generate_output_file(
     try:
         # Get the first and last timestamps from the parsed data
         if not parsed_data_model.data.empty:
-            # Sort the data by timestamp to ensure we get the correct first and last
-            sorted_data = parsed_data_model.data.sort_values(by="timestamp")
-            first_timestamp = parsed_data_model.get_timestamp(sorted_data.iloc[0])
-            last_timestamp = parsed_data_model.get_timestamp(sorted_data.iloc[-1])
+            # Check if timestamp column exists
+            if "timestamp" not in parsed_data_model.data.columns:
+                logger.warning("No 'timestamp' column found in parsed data. Looking for alternative timestamp columns.")
+                # Try to find a column that might contain timestamps
+                timestamp_cols = [col for col in parsed_data_model.data.columns if 'timestamp' in str(col).lower()]
+                if timestamp_cols:
+                    logger.info(f"Using '{timestamp_cols[0]}' as timestamp column")
+                    timestamp_col = timestamp_cols[0]
+                else:
+                    logger.error("No timestamp column found in parsed data")
+                    raise ValueError("No timestamp column found in parsed data")
+            else:
+                timestamp_col = "timestamp"
+
+            # Get all timestamps and ensure they're valid
+            all_timestamps = []
+            for i, row in parsed_data_model.data.iterrows():
+                timestamp = parsed_data_model.get_timestamp(row)
+                if timestamp and timestamp != "nan" and timestamp.strip() and timestamp.lower() != "none":
+                    all_timestamps.append(timestamp)
+
+            if not all_timestamps:
+                logger.error("No valid timestamps found in parsed data")
+                raise ValueError("No valid timestamps found in parsed data")
+
+            logger.debug(f"Found {len(all_timestamps)} valid timestamps")
+
+            # Sort timestamps (they might be in string format)
+            # This ensures correct chronological ordering
+            all_timestamps.sort()
+
+            # Get first and last timestamps
+            first_timestamp = all_timestamps[0]
+            last_timestamp = all_timestamps[-1]
+
+            # Final check to ensure timestamps are not None or empty
+            if first_timestamp.lower() == "none" or not first_timestamp.strip():
+                logger.warning("First timestamp is 'None' or empty, trying to find another valid timestamp")
+                # Try to find the first valid timestamp that's not None or empty
+                for ts in all_timestamps:
+                    if ts.lower() != "none" and ts.strip():
+                        first_timestamp = ts
+                        logger.info(f"Found alternative first timestamp: {first_timestamp}")
+                        break
+                else:
+                    logger.warning("No valid alternative first timestamp found, using empty string")
+                    first_timestamp = ""
+
+            if last_timestamp.lower() == "none" or not last_timestamp.strip():
+                logger.warning("Last timestamp is 'None' or empty, trying to find another valid timestamp")
+                # Try to find the last valid timestamp that's not None or empty
+                for ts in reversed(all_timestamps):
+                    if ts.lower() != "none" and ts.strip():
+                        last_timestamp = ts
+                        logger.info(f"Found alternative last timestamp: {last_timestamp}")
+                        break
+                else:
+                    logger.warning("No valid alternative last timestamp found, using empty string")
+                    last_timestamp = ""
+
+            logger.info(f"First timestamp: {first_timestamp}")
+            logger.info(f"Last timestamp: {last_timestamp}")
 
             # Create the rangetime.txt file path in the same directory as the output file
             output_dir = Path(output_path).parent

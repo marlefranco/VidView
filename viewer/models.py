@@ -742,9 +742,12 @@ class SpectralDataModel:
         Returns
         -------
         str
-            Timestamp as a string.
+            Timestamp as a string, or empty string if not found or None.
         """
-        return str(row.get("timestamp", ""))
+        timestamp = row.get("timestamp", "")
+        if timestamp is None or str(timestamp).lower() == "none":
+            return ""
+        return str(timestamp)
 
 
 class FrameTimesModel:
